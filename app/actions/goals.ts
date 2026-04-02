@@ -137,7 +137,7 @@ async function validateHierarchy(
   }
 
   if (currentGoalId) {
-    const descendants = await prisma.goal.findMany({
+    const descendants: { id: string }[] = await prisma.goal.findMany({
       where: {
         parentId: currentGoalId,
       },
@@ -157,7 +157,7 @@ async function validateHierarchy(
         throw new Error("A goal cannot be moved underneath one of its descendants.");
       }
 
-      const children = await prisma.goal.findMany({
+      const children: { id: string }[] = await prisma.goal.findMany({
         where: { parentId: nextId },
         select: { id: true },
       });
