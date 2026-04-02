@@ -1,7 +1,10 @@
 import { subDays } from "date-fns";
-import type { Goal, GoalActivity } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+
+/** Inferred from the client so we do not rely on `@prisma/client` exporting model aliases (varies by tooling). */
+type GoalRow = Awaited<ReturnType<typeof prisma.goal.findMany>>[number];
+type GoalActivityRow = Awaited<ReturnType<typeof prisma.goalActivity.findMany>>[number];
 
 export async function getDashboardData() {
   const [goals, activities] = await Promise.all([
@@ -21,14 +24,14 @@ export async function getDashboardData() {
   ]);
 
   return {
-    goals: goals.map((goal: Goal) => ({
+    goals: goals.map((goal: GoalRow) => ({
       ...goal,
       dueDate: goal.dueDate?.toISOString() ?? null,
       startDate: goal.startDate?.toISOString() ?? null,
       createdAt: goal.createdAt.toISOString(),
       updatedAt: goal.updatedAt.toISOString(),
     })),
-    activities: activities.map((activity: GoalActivity) => ({
+    activities: activities.map((activity: GoalActivityRow) => ({
       ...activity,
       activityDate: activity.activityDate.toISOString(),
       createdAt: activity.createdAt.toISOString(),
