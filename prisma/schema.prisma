@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GoalLevel {
+  YEARLY
+  QUARTERLY
+  MONTHLY
+  WEEKLY
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+  ARCHIVED
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GoalKind {
+  STANDARD
+  FINANCIAL
+}
+
+enum GoalCurrency {
+  INR
+  CAD
+}
+
+model Goal {
+  id           String         @id @default(cuid())
+  title        String
+  description  String?        @db.Text
+  kind         GoalKind       @default(STANDARD)
+  currency     GoalCurrency?
+  level        GoalLevel
+  parentId     String?
+  status       GoalStatus     @default(NOT_STARTED)
+  progress     Int            @default(0)
+  targetValue  Float?
+  currentValue Float?
+  dueDate      DateTime?
+  startDate    DateTime?
+  priority     GoalPriority   @default(MEDIUM)
+  tags         String[]
+  notes        String?        @db.Text
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  parent       Goal?          @relation("GoalHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Goal[]         @relation("GoalHierarchy")
+  activities   GoalActivity[]
+
+  @@index([level])
+  @@index([kind])
+  @@index([currency])
+  @@index([status])
+  @@index([priority])
+  @@index([parentId])
+  @@index([dueDate])
+}
+
+model GoalActivity {
+  id            String   @id @default(cuid())
+  goalId         String
+  activityDate   DateTime
+  intensity      Int      @default(1)
+  completedCount Int      @default(0)
+  note           String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  goal           Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, activityDate])
+  @@unique([goalId, activityDate])
+}
