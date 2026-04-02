@@ -1,6 +1,8 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+
+// Import generated client by path so types/runtime always resolve (some CI workers fail on `@prisma/client` re-exports).
+import { PrismaClient } from "../node_modules/.prisma/client/index.js";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
