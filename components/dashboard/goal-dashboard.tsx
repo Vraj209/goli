@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { BarChart3, CalendarRange, ListTree, Plus, Target } from "lucide-react";
+import { ListTree, Plus } from "lucide-react";
 
 import {
   addGoalAmount,
@@ -16,25 +16,17 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { FinancialSummaryPanel } from "@/components/dashboard/financial-summary-panel";
 import { GoalFilters } from "@/components/dashboard/goal-filters";
 import { GoalFormPanel } from "@/components/dashboard/goal-form-panel";
-import { GoalHeatmap } from "@/components/dashboard/goal-heatmap";
 import { GoalHierarchyTree } from "@/components/dashboard/goal-hierarchy-tree";
-import { GoalProgressBar } from "@/components/dashboard/goal-progress-bar";
-import { QuarterProgressGrid } from "@/components/dashboard/quarter-progress-grid";
 import { SummaryStats } from "@/components/dashboard/summary-stats";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
-import { WeeklyFocusPanel } from "@/components/dashboard/weekly-focus-panel";
 import {
   buildFinancialSummary,
   buildGoalTree,
-  buildHeatmap,
-  buildQuarterSummaries,
   buildVisibleGoalIds,
   computeSummaryStats,
   emptyGoalFormValues,
   getCurrentQuarter,
   getDescendantIds,
-  getFocusBuckets,
-  getProgressTone,
   getWeeklyMotivation,
   labelMap,
   type DashboardFilters,
@@ -78,7 +70,7 @@ export function GoalDashboard({
   view = "overview",
 }: GoalDashboardProps) {
   const [goals, setGoals] = useState(initialGoals);
-  const [activities, setActivities] = useState(initialActivities);
+  const [, setActivities] = useState(initialActivities);
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
   const [search, setSearch] = useState("");
   const [panelMode, setPanelMode] = useState<"create" | "edit">("create");
@@ -133,26 +125,6 @@ export function GoalDashboard({
   const financialSummary = useMemo(() => buildFinancialSummary(goals), [goals]);
   const tree = useMemo(() => buildGoalTree(goals), [goals]);
   const visibleIds = useMemo(() => buildVisibleGoalIds(goals, search, filters), [filters, goals, search]);
-  const heatmap = useMemo(() => buildHeatmap(activities), [activities]);
-  const quarterSummaries = useMemo(() => buildQuarterSummaries(goals), [goals]);
-  const focusBuckets = useMemo(() => getFocusBuckets(goals), [goals]);
-
-  const progressOverview = useMemo(() => {
-    return GOAL_LEVELS.map((level) => {
-      const matching = goals.filter((goal) => goal.level === level);
-      const progress = matching.length
-        ? Math.round(matching.reduce((sum, goal) => sum + goal.progress, 0) / matching.length)
-        : 0;
-      const done = matching.filter((goal) => goal.status === "COMPLETED").length;
-
-      return {
-        level,
-        progress,
-        done,
-        total: matching.length,
-      };
-    });
-  }, [goals]);
 
   const summaryStats = useMemo(
     () => [
@@ -518,67 +490,7 @@ export function GoalDashboard({
 
         {view === "overview" ? (
           <>
-            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
-          <div className="border border-white/10 bg-[#0b0b0d] p-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-zinc-500">
-                  Progress overview
-                </p>
-                <h2 className="mt-3 text-xl font-semibold tracking-tight text-zinc-50">
-                  Year, quarter, month, and week at a glance
-                </h2>
-              </div>
-              <p className="font-mono text-xs uppercase tracking-[0.22em] text-zinc-500">
-                Overall progress {summary.overallProgress}%
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {progressOverview.map((item) => (
-                <article key={item.level} className="border border-white/10 bg-white/2 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
-                        {labelMap.level[item.level]}
-                      </p>
-                      <h3 className="mt-3 text-2xl font-semibold text-zinc-50">
-                        {item.progress}%
-                      </h3>
-                    </div>
-                    <div className="flex h-10 w-10 items-center justify-center border border-white/10 bg-black text-zinc-300">
-                      {item.level === "YEARLY" ? (
-                        <Target className="h-4 w-4" />
-                      ) : item.level === "QUARTERLY" ? (
-                        <CalendarRange className="h-4 w-4" />
-                      ) : (
-                        <BarChart3 className="h-4 w-4" />
-                      )}
-                    </div>
-                  </div>
-                  <p className="mt-4 text-sm text-zinc-400">
-                    {item.done} of {item.total} completed
-                  </p>
-                  <div className="mt-4">
-                    <GoalProgressBar
-                      value={item.progress}
-                      tone={getProgressTone(item.progress === 100 ? "COMPLETED" : "IN_PROGRESS")}
-                    />
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <GoalHeatmap cells={heatmap} />
-            </section>
-
             <FinancialSummaryPanel summary={financialSummary} goals={goals} />
-
-            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
-              <QuarterProgressGrid quarters={quarterSummaries} activeQuarter={activeQuarter} />
-              <WeeklyFocusPanel buckets={focusBuckets} />
-            </section>
           </>
         ) : null}
 
