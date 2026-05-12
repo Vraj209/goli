@@ -573,7 +573,7 @@ export function GoalDashboard({
           <GoalHeatmap cells={heatmap} />
             </section>
 
-            <FinancialSummaryPanel summary={financialSummary} />
+            <FinancialSummaryPanel summary={financialSummary} goals={goals} />
 
             <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
               <QuarterProgressGrid quarters={quarterSummaries} activeQuarter={activeQuarter} />

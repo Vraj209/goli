@@ -1,15 +1,25 @@
 import { Landmark, PiggyBank, TrendingUp } from "lucide-react";
 
-import type { FinancialSummary } from "@/lib/goals";
-import { formatAmount, formatCurrencyAmount } from "@/lib/goals";
+import { GoalProgressBar } from "@/components/dashboard/goal-progress-bar";
+import type { FinancialSummary, GoalRecord } from "@/lib/goals";
+import { formatAmount, formatCurrencyAmount, getFinancialGoalCopy, labelMap } from "@/lib/goals";
 
 type FinancialSummaryPanelProps = {
   summary: FinancialSummary;
+  goals: GoalRecord[];
 };
 
-export function FinancialSummaryPanel({
-  summary,
-}: FinancialSummaryPanelProps) {
+export function FinancialSummaryPanel({ summary, goals }: FinancialSummaryPanelProps) {
+  const financialGoals = goals
+    .filter((goal) => goal.kind === "FINANCIAL")
+    .sort((left, right) => {
+      if (left.status !== right.status) {
+        return left.status === "COMPLETED" ? 1 : -1;
+      }
+
+      return right.progress - left.progress;
+    });
+
   if (!summary.totalFinancialGoals) {
     return null;
   }
@@ -60,52 +70,79 @@ export function FinancialSummaryPanel({
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        {summary.byCurrency.map((currencySummary) => (
-          <article
-            key={currencySummary.currency}
-            className="border border-white/10 bg-white/2 p-4"
-          >
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-                  {currencySummary.currency} dashboard
-                </p>
-                <h3 className="mt-3 text-xl font-semibold tracking-tight text-zinc-50">
-                  {currencySummary.goals} financial goals
-                </h3>
-              </div>
-              <p className="font-mono text-xs uppercase tracking-[0.22em] text-zinc-500">
-                {currencySummary.averageProgress}% avg progress
-              </p>
-            </div>
+        {financialGoals.map((goal) => {
+          const copy = getFinancialGoalCopy(goal);
+          const currentValue = goal.currentValue ?? 0;
+          const targetValue = goal.targetValue ?? 0;
+          const remainingValue = Math.max(0, targetValue - currentValue);
 
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <MiniMetric
-                label="Tracked"
-                value={formatCurrencyAmount(
-                  currencySummary.totalTargetAmount,
-                  currencySummary.currency,
-                )}
-              />
-              <MiniMetric
-                label="Saved / paid"
-                value={formatCurrencyAmount(
-                  currencySummary.totalCurrentAmount,
-                  currencySummary.currency,
-                )}
-                tone="success"
-              />
-              <MiniMetric
-                label="Remaining"
-                value={formatCurrencyAmount(
-                  currencySummary.totalRemainingAmount,
-                  currencySummary.currency,
-                )}
-                tone="warning"
-              />
-            </div>
-          </article>
-        ))}
+          return (
+            <article key={goal.id} className="border border-white/10 bg-white/2 p-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-zinc-500">
+                      {goal.currency ?? "Goal"}
+                    </p>
+                    <span className="border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                      {labelMap.status[goal.status]}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-zinc-50">
+                    {goal.title}
+                  </h3>
+                  {goal.description ? (
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                      {goal.description}
+                    </p>
+                  ) : null}
+                </div>
+
+                <p className="font-mono text-xs uppercase tracking-[0.22em] text-zinc-500">
+                  {goal.progress}% complete
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between gap-3 font-mono text-xs text-zinc-400">
+                  <span>{copy.progressLabel}</span>
+                  <span>
+                    {formatCurrencyAmount(currentValue, goal.currency)} /{" "}
+                    {formatCurrencyAmount(targetValue, goal.currency)}
+                  </span>
+                </div>
+                <GoalProgressBar value={goal.progress} />
+              </div>
+
+              <dl className="mt-5 grid gap-4 border-t border-white/10 pt-4 md:grid-cols-3">
+                <div>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                    Target
+                  </dt>
+                  <dd className="mt-2 text-lg font-semibold tracking-tight text-zinc-50">
+                    {formatCurrencyAmount(targetValue, goal.currency)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                    {copy.summaryLabel}
+                  </dt>
+                  <dd className="mt-2 text-lg font-semibold tracking-tight text-emerald-300">
+                    {formatCurrencyAmount(currentValue, goal.currency)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+                    Remaining
+                  </dt>
+                  <dd className="mt-2 text-lg font-semibold tracking-tight text-amber-300">
+                    {formatCurrencyAmount(remainingValue, goal.currency)}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -148,31 +185,5 @@ function MetricCard({
       </div>
       <p className="mt-4 text-sm text-zinc-400">{caption}</p>
     </article>
-  );
-}
-
-function MiniMetric({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "success" | "warning";
-}) {
-  const toneClassName =
-    tone === "success"
-      ? "text-emerald-300"
-      : tone === "warning"
-        ? "text-amber-300"
-        : "text-zinc-50";
-
-  return (
-    <div className="border border-white/10 bg-black/40 p-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
-        {label}
-      </p>
-      <p className={`mt-3 text-lg font-semibold tracking-tight ${toneClassName}`}>{value}</p>
-    </div>
   );
 }
