@@ -22,12 +22,27 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeScript = `
+    try {
+      const storedTheme = localStorage.getItem("goli-theme");
+      const theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+      document.documentElement.classList.remove("light", "dark");
+      document.documentElement.classList.add(theme);
+    } catch {
+      document.documentElement.classList.add("dark");
+    }
+  `;
+
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full bg-black antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} h-full bg-background antialiased`}
     >
-      <body className="min-h-full bg-black text-zinc-50">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-full bg-background text-foreground">{children}</body>
     </html>
   );
 }

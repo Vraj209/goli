@@ -1,10 +1,29 @@
 @import "tailwindcss";
 
 :root {
+  --background: #f6f7f9;
+  --foreground: #18181b;
+  --muted: #71717a;
+  --border: rgba(24, 24, 27, 0.12);
+  --surface: #ffffff;
+  --surface-subtle: #f4f4f5;
+  --control: #ffffff;
+  --shell-background:
+    radial-gradient(circle at top, rgba(8, 145, 178, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+.dark {
   --background: #070709;
   --foreground: #f4f4f5;
   --muted: #a1a1aa;
   --border: rgba(255, 255, 255, 0.08);
+  --surface: #0b0b0d;
+  --surface-subtle: rgba(255, 255, 255, 0.03);
+  --control: #000000;
+  --shell-background:
+    radial-gradient(circle at top, rgba(56, 189, 248, 0.08), transparent 30%),
+    linear-gradient(180deg, #060607 0%, #09090b 100%);
 }
 
 @theme inline {
@@ -21,6 +40,10 @@
 }
 
 html {
+  color-scheme: light;
+}
+
+html.dark {
   color-scheme: dark;
 }
 
@@ -29,6 +52,96 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.dashboard-shell {
+  background: var(--shell-background);
+}
+
+.light .grain::before {
+  background-image: linear-gradient(
+      rgba(15, 23, 42, 0.025),
+      rgba(15, 23, 42, 0.025)
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230f172a' fill-opacity='.04'%3E%3Cpath d='M0 0h1v1H0zM20 17h1v1h-1zM31 61h1v1h-1zM49 12h1v1h-1zM63 24h1v1h-1zM74 51h1v1h-1zM80 10h1v1h-1zM100 33h1v1h-1zM117 84h1v1h-1zM130 45h1v1h-1zM12 93h1v1h-1zM44 101h1v1h-1zM72 118h1v1h-1zM96 111h1v1h-1zM111 17h1v1h-1z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.light .bg-\[\#0b0b0d\],
+.light .bg-\[\#09090b\],
+.light .bg-\[\#08080a\],
+.light .bg-black {
+  background-color: var(--surface);
+}
+
+.light .bg-black\/40,
+.light .bg-black\/50 {
+  background-color: rgba(255, 255, 255, 0.78);
+}
+
+.light .bg-white\/2,
+.light .bg-white\/5,
+.light .bg-white\/\[0\.02\],
+.light .bg-white\/\[0\.03\] {
+  background-color: var(--surface-subtle);
+}
+
+.light .border-white\/10 {
+  border-color: rgba(24, 24, 27, 0.12);
+}
+
+.light .border-white\/20,
+.light .hover\:border-white\/20:hover {
+  border-color: rgba(24, 24, 27, 0.22);
+}
+
+.light .text-zinc-50,
+.light .text-zinc-100 {
+  color: #18181b;
+}
+
+.light .text-zinc-300,
+.light .text-zinc-400 {
+  color: #52525b;
+}
+
+.light .text-zinc-500 {
+  color: #71717a;
+}
+
+.light .text-zinc-600,
+.light .placeholder\:text-zinc-600::placeholder {
+  color: #a1a1aa;
+}
+
+.light .hover\:text-zinc-100:hover {
+  color: #18181b;
+}
+
+.light .text-cyan-100 {
+  color: #0e7490;
+}
+
+.light .text-emerald-100,
+.light .text-emerald-200,
+.light .text-emerald-300 {
+  color: #047857;
+}
+
+.light .text-amber-200,
+.light .text-amber-300 {
+  color: #b45309;
+}
+
+.light .text-rose-100,
+.light .text-rose-200,
+.light .text-rose-300 {
+  color: #be123c;
+}
+
+.light input,
+.light textarea,
+.light button {
+  color-scheme: light;
 }
 
 button,

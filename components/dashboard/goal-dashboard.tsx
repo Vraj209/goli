@@ -20,6 +20,7 @@ import { GoalHierarchyTree } from "@/components/dashboard/goal-hierarchy-tree";
 import { GoalProgressBar } from "@/components/dashboard/goal-progress-bar";
 import { QuarterProgressGrid } from "@/components/dashboard/quarter-progress-grid";
 import { SummaryStats } from "@/components/dashboard/summary-stats";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { WeeklyFocusPanel } from "@/components/dashboard/weekly-focus-panel";
 import {
   buildFinancialSummary,
@@ -432,6 +433,7 @@ export function GoalDashboard({
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <ThemeToggle />
               <button
                 type="button"
                 onClick={() => openCreatePanel("YEARLY", null)}
