@@ -13,6 +13,7 @@ import { ThemedSelect } from "@/components/dashboard/themed-controls";
 type GoalFiltersProps = {
   filters: DashboardFilters;
   search: string;
+  hideLevel?: boolean;
   onSearchChange: (value: string) => void;
   onFilterChange: <Key extends keyof DashboardFilters>(
     key: Key,
@@ -23,6 +24,7 @@ type GoalFiltersProps = {
 export function GoalFilters({
   filters,
   search,
+  hideLevel = false,
   onSearchChange,
   onFilterChange,
 }: GoalFiltersProps) {
@@ -51,7 +53,7 @@ export function GoalFilters({
         </label>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className={`mt-5 grid gap-3 md:grid-cols-2 ${hideLevel ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
         <ThemedSelect
           label="Status"
           value={filters.status}
@@ -61,15 +63,17 @@ export function GoalFilters({
           }
           onChange={(value) => onFilterChange("status", value as DashboardFilters["status"])}
         />
-        <ThemedSelect
-          label="Level"
-          value={filters.level}
-          options={["ALL", ...GOAL_LEVELS]}
-          getLabel={(value) =>
-            value === "ALL" ? "All levels" : labelMap.level[value as GoalLevelValue]
-          }
-          onChange={(value) => onFilterChange("level", value as DashboardFilters["level"])}
-        />
+        {hideLevel ? null : (
+          <ThemedSelect
+            label="Level"
+            value={filters.level}
+            options={["ALL", ...GOAL_LEVELS]}
+            getLabel={(value) =>
+              value === "ALL" ? "All levels" : labelMap.level[value as GoalLevelValue]
+            }
+            onChange={(value) => onFilterChange("level", value as DashboardFilters["level"])}
+          />
+        )}
         <ThemedSelect
           label="Priority"
           value={filters.priority}

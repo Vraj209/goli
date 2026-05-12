@@ -9,6 +9,7 @@ import {
   getProgressTone,
   isFinancialGoal,
   labelMap,
+  type GoalLevelValue,
   type GoalNode,
   type GoalRecord,
 } from "@/lib/goals";
@@ -26,6 +27,8 @@ type GoalHierarchyTreeProps = {
   onComplete: (goal: GoalRecord) => void;
   onProgressChange: (goal: GoalRecord, progress: number) => void;
   onAddAmount: (goal: GoalRecord, amount: number) => void;
+  mode?: "tree" | "level";
+  activeLevel?: GoalLevelValue;
 };
 
 const statusClassName = {
@@ -47,23 +50,32 @@ export function GoalHierarchyTree({
   onComplete,
   onProgressChange,
   onAddAmount,
+  mode = "tree",
+  activeLevel = "YEARLY",
 }: GoalHierarchyTreeProps) {
   const filteredTree = tree.filter((goal) => visibleIds.has(goal.id));
+  const levelGoals =
+    mode === "level"
+      ? flattenGoals(tree).filter((goal) => goal.level === activeLevel && visibleIds.has(goal.id))
+      : [];
+  const visibleGoals = mode === "level" ? levelGoals : filteredTree;
 
   return (
     <section className="border border-white/10 bg-[#0b0b0d] p-5">
       <div>
         <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-zinc-500">
-          Hierarchy
+          {mode === "level" ? labelMap.level[activeLevel] : "Hierarchy"}
         </p>
         <h2 className="mt-3 text-xl font-semibold tracking-tight text-zinc-50">
-          One-page goal tree from yearly direction to weekly execution
+          {mode === "level"
+            ? `${labelMap.level[activeLevel]} goals in a focused working list`
+            : "One-page goal tree from yearly direction to weekly execution"}
         </h2>
       </div>
 
       <div className="mt-6 space-y-3">
-        {filteredTree.length ? (
-          filteredTree.map((goal) => (
+        {visibleGoals.length ? (
+          visibleGoals.map((goal) => (
             <GoalTreeNode
               key={goal.id}
               goal={goal}
@@ -77,16 +89,29 @@ export function GoalHierarchyTree({
               onComplete={onComplete}
               onProgressChange={onProgressChange}
               onAddAmount={onAddAmount}
+              mode={mode}
             />
           ))
         ) : (
           <div className="border border-dashed border-white/10 px-4 py-10 text-sm text-zinc-500">
-            No goals match the current filters.
+            No {mode === "level" ? labelMap.level[activeLevel].toLowerCase() : "goals"} match the
+            current filters.
           </div>
         )}
       </div>
     </section>
   );
+}
+
+function flattenGoals(goals: GoalNode[]) {
+  const items: GoalNode[] = [];
+
+  for (const goal of goals) {
+    items.push(goal);
+    items.push(...flattenGoals(goal.children));
+  }
+
+  return items;
 }
 
 function GoalTreeNode({
@@ -101,6 +126,7 @@ function GoalTreeNode({
   onComplete,
   onProgressChange,
   onAddAmount,
+  mode,
 }: {
   goal: GoalNode;
   depth: number;
@@ -113,9 +139,10 @@ function GoalTreeNode({
   onComplete: (goal: GoalRecord) => void;
   onProgressChange: (goal: GoalRecord, progress: number) => void;
   onAddAmount: (goal: GoalRecord, amount: number) => void;
+  mode: "tree" | "level";
 }) {
   const visibleChildren = goal.children.filter((child) => visibleIds.has(child.id));
-  const isExpanded = expandedIds.has(goal.id);
+  const isExpanded = mode === "tree" && expandedIds.has(goal.id);
   const isPending = pendingId === goal.id;
   const canCreateChild = goal.level !== "WEEKLY";
   const periodLabel = getGoalPeriodLabel(goal.level, goal.startDate, goal.dueDate);
@@ -143,15 +170,17 @@ function GoalTreeNode({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onToggleExpand(goal.id)}
-                className="flex h-7 w-7 items-center justify-center border border-white/10 text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100"
-              >
-                <ChevronRight
-                  className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                />
-              </button>
+              {mode === "tree" ? (
+                <button
+                  type="button"
+                  onClick={() => onToggleExpand(goal.id)}
+                  className="flex h-7 w-7 items-center justify-center border border-white/10 text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100"
+                >
+                  <ChevronRight
+                    className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                  />
+                </button>
+              ) : null}
               <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
                 {labelMap.level[goal.level]}
               </span>
@@ -267,7 +296,9 @@ function GoalTreeNode({
 
       <div
         className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ${
-          isExpanded && visibleChildren.length ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-70"
+          isExpanded && visibleChildren.length
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-70"
         }`}
       >
         <div className="min-h-0 space-y-3 pt-3">
@@ -285,6 +316,7 @@ function GoalTreeNode({
               onComplete={onComplete}
               onProgressChange={onProgressChange}
               onAddAmount={onAddAmount}
+              mode={mode}
             />
           ))}
         </div>

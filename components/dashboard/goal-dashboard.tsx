@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { BarChart3, CalendarRange, Plus, Target } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, CalendarRange, ListTree, Plus, Target } from "lucide-react";
 
 import {
   addGoalAmount,
@@ -48,6 +49,7 @@ import {
 type GoalDashboardProps = {
   initialGoals: GoalRecord[];
   initialActivities: GoalActivityRecord[];
+  view?: "overview" | "goals";
 };
 
 const defaultFilters: DashboardFilters = {
@@ -73,6 +75,7 @@ function intensityForStatus(status: GoalStatusValue) {
 export function GoalDashboard({
   initialGoals,
   initialActivities,
+  view = "overview",
 }: GoalDashboardProps) {
   const [goals, setGoals] = useState(initialGoals);
   const [activities, setActivities] = useState(initialActivities);
@@ -85,6 +88,7 @@ export function GoalDashboard({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
+  const [activeLevel, setActiveLevel] = useState<GoalLevelValue>("YEARLY");
   const [isPending, startTransition] = useTransition();
   const searchRef = useRef<HTMLInputElement | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
@@ -128,10 +132,7 @@ export function GoalDashboard({
   const summary = useMemo(() => computeSummaryStats(goals), [goals]);
   const financialSummary = useMemo(() => buildFinancialSummary(goals), [goals]);
   const tree = useMemo(() => buildGoalTree(goals), [goals]);
-  const visibleIds = useMemo(
-    () => buildVisibleGoalIds(goals, search, filters),
-    [filters, goals, search],
-  );
+  const visibleIds = useMemo(() => buildVisibleGoalIds(goals, search, filters), [filters, goals, search]);
   const heatmap = useMemo(() => buildHeatmap(activities), [activities]);
   const quarterSummaries = useMemo(() => buildQuarterSummaries(goals), [goals]);
   const focusBuckets = useMemo(() => getFocusBuckets(goals), [goals]);
@@ -239,14 +240,14 @@ export function GoalDashboard({
     setEditingGoalId(null);
   }
 
-  function applyGoalUpdate(updatedGoal: GoalRecord) {
+  function applyGoalUpdates(updatedGoals: GoalRecord[]) {
     setGoals((current) => {
-      const exists = current.some((goal) => goal.id === updatedGoal.id);
-      if (!exists) {
-        return [...current, updatedGoal];
-      }
+      const updates = new Map(updatedGoals.map((goal) => [goal.id, goal]));
+      const existingIds = new Set(current.map((goal) => goal.id));
+      const merged = current.map((goal) => updates.get(goal.id) ?? goal);
+      const inserted = updatedGoals.filter((goal) => !existingIds.has(goal.id));
 
-      return current.map((goal) => (goal.id === updatedGoal.id ? updatedGoal : goal));
+      return [...merged, ...inserted];
     });
   }
 
@@ -262,30 +263,32 @@ export function GoalDashboard({
       void (async () => {
         try {
           if (panelMode === "create") {
-            const created = await createGoal({
+            const updates = await createGoal({
               ...formValues,
               title: formValues.title.trim(),
               description: formValues.description.trim() || null,
               notes: formValues.notes.trim() || null,
               tags: formValues.tags,
             });
+            const created = updates[0];
 
-            applyGoalUpdate(created);
+            applyGoalUpdates(updates);
             upsertActivity(created.id, created.status, "Created goal");
 
             if (created.parentId) {
               setExpandedIds((current) => new Set(current).add(created.parentId!));
             }
           } else if (editingGoalId) {
-            const updated = await updateGoal(editingGoalId, {
+            const updates = await updateGoal(editingGoalId, {
               ...formValues,
               title: formValues.title.trim(),
               description: formValues.description.trim() || null,
               notes: formValues.notes.trim() || null,
               tags: formValues.tags,
             });
+            const updated = updates[0];
 
-            applyGoalUpdate(updated);
+            applyGoalUpdates(updates);
             upsertActivity(updated.id, updated.status, "Updated goal");
           }
 
@@ -312,12 +315,15 @@ export function GoalDashboard({
     startTransition(() => {
       void (async () => {
         try {
-          await deleteGoal(editingGoalId);
+          const result = await deleteGoal(editingGoalId);
           setGoals((current) => {
             const descendants = getDescendantIds(current)(editingGoalId);
-            return current.filter(
+            const remaining = current.filter(
               (goal) => goal.id !== editingGoalId && !descendants.has(goal.id),
             );
+            const updates = new Map(result.updates.map((goal) => [goal.id, goal]));
+
+            return remaining.map((goal) => updates.get(goal.id) ?? goal);
           });
           closePanel();
         } catch (error) {
@@ -343,8 +349,9 @@ export function GoalDashboard({
     startTransition(() => {
       void (async () => {
         try {
-          const updated = await markGoalComplete(goal.id);
-          applyGoalUpdate(updated);
+          const updates = await markGoalComplete(goal.id);
+          const updated = updates[0];
+          applyGoalUpdates(updates);
           upsertActivity(updated.id, updated.status, "Marked complete", 1);
         } finally {
           setPendingId(null);
@@ -358,8 +365,9 @@ export function GoalDashboard({
     startTransition(() => {
       void (async () => {
         try {
-          const updated = await updateGoalProgress(goal.id, progress);
-          applyGoalUpdate(updated);
+          const updates = await updateGoalProgress(goal.id, progress);
+          const updated = updates[0];
+          applyGoalUpdates(updates);
           upsertActivity(
             updated.id,
             updated.status,
@@ -378,8 +386,9 @@ export function GoalDashboard({
     startTransition(() => {
       void (async () => {
         try {
-          const updated = await addGoalAmount(goal.id, amount);
-          applyGoalUpdate(updated);
+          const updates = await addGoalAmount(goal.id, amount);
+          const updated = updates[0];
+          applyGoalUpdates(updates);
           upsertActivity(
             updated.id,
             updated.status,
@@ -416,7 +425,8 @@ export function GoalDashboard({
   return (
     <>
       <div className="space-y-6">
-        <section className="border border-white/10 bg-[#0b0b0d] p-5">
+        {view === "overview" ? (
+          <section className="border border-white/10 bg-[#0b0b0d] p-5">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-4xl">
               <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-zinc-500">
@@ -442,6 +452,13 @@ export function GoalDashboard({
                 <Plus className="h-4 w-4" />
                 New goal
               </button>
+              <Link
+                href="/goals"
+                className="inline-flex h-11 items-center gap-2 border border-white/10 bg-black px-4 text-xs uppercase tracking-[0.2em] text-zinc-300 transition-colors hover:border-white/20 hover:text-zinc-100"
+              >
+                <ListTree className="h-4 w-4" />
+                Goal lists
+              </Link>
               <div className="flex h-11 items-center border border-white/10 bg-black px-3 text-xs uppercase tracking-[0.2em] text-zinc-500">
                 <span className="mr-3">Shortcut</span>
                 <span className="font-mono text-zinc-300">N</span>
@@ -462,9 +479,46 @@ export function GoalDashboard({
           <div className="mt-6">
             <SummaryStats stats={summaryStats} />
           </div>
-        </section>
+          </section>
+        ) : (
+          <section className="border border-white/10 bg-[#0b0b0d] p-5">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-4xl">
+                <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-zinc-500">
+                  Goal Lists
+                </p>
+                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-zinc-50 md:text-5xl">
+                  Work the full system by level
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-400">
+                  Search, filter, and move between yearly, quarterly, monthly, and weekly goals.
+                </p>
+              </div>
 
-        <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+              <div className="flex flex-wrap gap-3">
+                <ThemeToggle />
+                <Link
+                  href="/"
+                  className="inline-flex h-11 items-center border border-white/10 bg-black px-4 text-xs uppercase tracking-[0.2em] text-zinc-300 transition-colors hover:border-white/20 hover:text-zinc-100"
+                >
+                  Overview
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => openCreatePanel(activeLevel, null)}
+                  className="inline-flex h-11 items-center gap-2 border border-cyan-400/40 bg-cyan-400/6 px-4 text-xs uppercase tracking-[0.2em] text-cyan-100 transition-colors hover:border-cyan-300/60"
+                >
+                  <Plus className="h-4 w-4" />
+                  New goal
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {view === "overview" ? (
+          <>
+            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
           <div className="border border-white/10 bg-[#0b0b0d] p-5">
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -517,44 +571,85 @@ export function GoalDashboard({
           </div>
 
           <GoalHeatmap cells={heatmap} />
-        </section>
+            </section>
 
-        <FinancialSummaryPanel summary={financialSummary} />
+            <FinancialSummaryPanel summary={financialSummary} />
 
-        <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
-          <QuarterProgressGrid quarters={quarterSummaries} activeQuarter={activeQuarter} />
-          <WeeklyFocusPanel buckets={focusBuckets} />
-        </section>
+            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+              <QuarterProgressGrid quarters={quarterSummaries} activeQuarter={activeQuarter} />
+              <WeeklyFocusPanel buckets={focusBuckets} />
+            </section>
+          </>
+        ) : null}
 
-        <GoalFilters
-          filters={filters}
-          search={search}
-          onSearchChange={setSearch}
-          onFilterChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
-        />
-
-        <GoalHierarchyTree
-          tree={tree}
-          visibleIds={visibleIds}
-          expandedIds={expandedIds}
-          pendingId={pendingId}
-          onToggleExpand={(id) =>
-            setExpandedIds((current) => {
-              const next = new Set(current);
-              if (next.has(id)) {
-                next.delete(id);
-              } else {
-                next.add(id);
+        {view === "goals" ? (
+          <>
+            <GoalFilters
+              filters={filters}
+              search={search}
+              hideLevel
+              onSearchChange={setSearch}
+              onFilterChange={(key, value) =>
+                setFilters((current) => ({ ...current, [key]: value }))
               }
-              return next;
-            })
-          }
-          onEdit={openEditPanel}
-          onQuickAdd={handleQuickAdd}
-          onComplete={handleComplete}
-          onProgressChange={handleProgressChange}
-          onAddAmount={handleAddAmount}
-        />
+            />
+
+            <section className="border border-white/10 bg-[#0b0b0d] p-5">
+              <div className="grid gap-3 md:grid-cols-4">
+                {GOAL_LEVELS.map((level) => {
+                  const active = activeLevel === level;
+                  const total = goals.filter((goal) => goal.level === level).length;
+
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setActiveLevel(level)}
+                      className={`border px-4 py-3 text-left transition-colors ${
+                        active
+                          ? "border-cyan-400/40 bg-cyan-400/8 text-cyan-100"
+                          : "border-white/10 bg-white/[0.02] text-zinc-300 hover:border-white/20 hover:text-zinc-100"
+                      }`}
+                    >
+                      <span className="font-mono text-[10px] uppercase tracking-[0.22em]">
+                        {labelMap.level[level]}
+                      </span>
+                      <span className="mt-2 block text-2xl font-semibold tracking-tight">
+                        {total}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <GoalHierarchyTree
+              tree={tree}
+              visibleIds={visibleIds}
+              expandedIds={expandedIds}
+              pendingId={pendingId}
+              mode="level"
+              activeLevel={activeLevel}
+              onToggleExpand={(id) =>
+                setExpandedIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(id)) {
+                    next.delete(id);
+                  } else {
+                    next.add(id);
+                  }
+                  return next;
+                })
+              }
+              onEdit={openEditPanel}
+              onQuickAdd={handleQuickAdd}
+              onComplete={handleComplete}
+              onProgressChange={handleProgressChange}
+              onAddAmount={handleAddAmount}
+            />
+          </>
+        ) : null}
+
       </div>
 
       {panelOpen ? (

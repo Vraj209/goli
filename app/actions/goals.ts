@@ -69,6 +69,94 @@ function serializeGoal(goal: {
   };
 }
 
+type SerializedGoal = ReturnType<typeof serializeGoal>;
+
+function getRollupStatus(children: Array<{ status: GoalStatusValue; progress: number }>) {
+  if (!children.length) {
+    return "NOT_STARTED" satisfies GoalStatusValue;
+  }
+
+  const progress = Math.round(
+    children.reduce((sum, child) => sum + child.progress, 0) / children.length,
+  );
+
+  if (children.every((child) => child.status === "COMPLETED" || child.progress >= 100)) {
+    return "COMPLETED" satisfies GoalStatusValue;
+  }
+
+  if (children.some((child) => child.status === "BLOCKED")) {
+    return "BLOCKED" satisfies GoalStatusValue;
+  }
+
+  return progress > 0
+    ? ("IN_PROGRESS" satisfies GoalStatusValue)
+    : ("NOT_STARTED" satisfies GoalStatusValue);
+}
+
+async function recalculateGoalFromChildren(id: string) {
+  const children = await prisma.goal.findMany({
+    where: {
+      parentId: id,
+      status: {
+        not: "ARCHIVED",
+      },
+    },
+    select: {
+      progress: true,
+      status: true,
+    },
+  });
+
+  const progress = children.length
+    ? Math.round(children.reduce((sum, child) => sum + child.progress, 0) / children.length)
+    : 0;
+  const status = getRollupStatus(children);
+
+  return prisma.goal.update({
+    where: { id },
+    data: {
+      progress,
+      status,
+    },
+  });
+}
+
+async function recalculateAncestors(parentIds: Array<string | null | undefined>) {
+  const touched = new Map<string, SerializedGoal>();
+  const queue = parentIds.filter((id): id is string => Boolean(id));
+
+  while (queue.length) {
+    const parentId = queue.shift();
+
+    if (!parentId) {
+      continue;
+    }
+
+    const updated = await recalculateGoalFromChildren(parentId);
+    touched.set(updated.id, serializeGoal(updated));
+
+    if (updated.parentId) {
+      queue.push(updated.parentId);
+    }
+  }
+
+  return [...touched.values()];
+}
+
+async function withUpdatedAncestors(
+  updatedGoal: Awaited<ReturnType<typeof prisma.goal.update>>,
+  parentIds: Array<string | null | undefined> = [updatedGoal.parentId],
+) {
+  const updates = new Map<string, SerializedGoal>();
+  updates.set(updatedGoal.id, serializeGoal(updatedGoal));
+
+  for (const ancestor of await recalculateAncestors(parentIds)) {
+    updates.set(ancestor.id, ancestor);
+  }
+
+  return [...updates.values()];
+}
+
 function normalizeGoalPayload(payload: z.infer<typeof goalInputSchema>) {
   if (payload.kind !== "FINANCIAL") {
     return {
@@ -236,14 +324,19 @@ export async function createGoal(input: z.infer<typeof goalInputSchema>) {
   });
 
   await touchGoalActivity(created.id, created.status, "Created goal");
+  const updates = await withUpdatedAncestors(created);
   revalidatePath("/");
 
-  return serializeGoal(created);
+  return updates;
 }
 
 export async function updateGoal(id: string, input: z.infer<typeof goalInputSchema>) {
   const payload = normalizeGoalPayload(goalInputSchema.parse(input));
   await validateHierarchy(payload.level, payload.parentId, id);
+  const previous = await prisma.goal.findUnique({
+    where: { id },
+    select: { parentId: true },
+  });
 
   const updated = await prisma.goal.update({
     where: { id },
@@ -267,18 +360,25 @@ export async function updateGoal(id: string, input: z.infer<typeof goalInputSche
   });
 
   await touchGoalActivity(updated.id, updated.status, "Updated goal");
+  const updates = await withUpdatedAncestors(updated, [previous?.parentId, updated.parentId]);
   revalidatePath("/");
 
-  return serializeGoal(updated);
+  return updates;
 }
 
 export async function deleteGoal(id: string) {
+  const current = await prisma.goal.findUnique({
+    where: { id },
+    select: { parentId: true },
+  });
+
   await prisma.goal.delete({
     where: { id },
   });
 
+  const updates = await recalculateAncestors([current?.parentId]);
   revalidatePath("/");
-  return { id };
+  return { id, updates };
 }
 
 export async function markGoalComplete(id: string) {
@@ -300,9 +400,10 @@ export async function markGoalComplete(id: string) {
   });
 
   await touchGoalActivity(updated.id, updated.status, "Marked complete", 1);
+  const updates = await withUpdatedAncestors(updated);
   revalidatePath("/");
 
-  return serializeGoal(updated);
+  return updates;
 }
 
 export async function updateGoalProgress(id: string, progress: number) {
@@ -340,9 +441,10 @@ export async function updateGoalProgress(id: string, progress: number) {
     `Progress updated to ${safeProgress}%`,
     safeProgress >= 100 ? 1 : 0,
   );
+  const updates = await withUpdatedAncestors(updated);
   revalidatePath("/");
 
-  return serializeGoal(updated);
+  return updates;
 }
 
 export async function addGoalAmount(id: string, amount: number) {
@@ -384,7 +486,8 @@ export async function addGoalAmount(id: string, amount: number) {
     `Added amount ${safeAmount}`,
     nextProgress >= 100 ? 1 : 0,
   );
+  const updates = await withUpdatedAncestors(updated);
   revalidatePath("/");
 
-  return serializeGoal(updated);
+  return updates;
 }
